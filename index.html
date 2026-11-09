@@ -122,6 +122,7 @@ h1{font:700 clamp(1.45rem,6vw,2rem)/1.1 var(--display);margin:.35rem 0 0;letter-
 .w small,.opt small{display:block;font:500 .85rem var(--mono);color:var(--muted);margin-top:4px}
 .opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .opt{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px;font-weight:600;font-size:1.05rem;min-height:64px;overflow-wrap:anywhere;min-width:0}
+.say{background:var(--soft);color:var(--accent);border:0;border-radius:99px;padding:8px 18px;font-weight:600;font-size:.95rem}
 .is-right{border-color:var(--good)!important;color:var(--good)!important;box-shadow:inset 0 0 0 1px var(--good)}
 .is-wrong{border-color:var(--bad)!important;color:var(--bad)!important}
 
@@ -181,6 +182,10 @@ const LANGS={
 };
 const TOPICS=['Почему одни люди богатеют, а другие нет','Лучший день в твоей жизни','Что сделаешь, если завтра получишь миллион долларов','Чему ты научился за последний год','Какой бизнес ты бы открыл завтра и почему','Почему важно высыпаться','Город, в котором ты хочешь жить','Самая полезная привычка','Что бы ты сказал себе в 18 лет','Плюсы и минусы удалённой работы','Как правильно выбрать машину','Твоя любимая еда и почему','Что делает человека надёжным','Как ИИ изменит работу через 5 лет','Идеальные выходные','Почему люди бросают спорт','Фильм или книга, которые тебя изменили','Как торговаться на рынке','Как объяснить ребёнку, что такое деньги','Что важнее: талант или упорство'];
 const TW=['Шла Саша по шоссе и сосала сушку.','Карл у Клары украл кораллы, а Клара у Карла украла кларнет.','На дворе трава, на траве дрова. Не руби дрова на траве двора.','Ехал Грека через реку, видит Грека — в реке рак. Сунул Грека руку в реку, рак за руку Греку цап.','От топота копыт пыль по полю летит.','Бык тупогуб, тупогубенький бычок, у быка бела губа была тупа.','Четыре чёрненьких чумазеньких чертёнка чертили чёрными чернилами чертёж.','Сшит колпак не по-колпаковски, вылит колокол не по-колоколовски.','Купила бабуся бусы Марусе.','Корабли лавировали, лавировали, да не вылавировали.'];
+
+const VOICE={en:'en-US',es:'es-ES',de:'de-DE',fr:'fr-FR',tr:'tr-TR',zh:'zh-CN'};
+function say(l,i){try{if(S.voice===false||!window.speechSynthesis)return;const t=LANGS[l].w[i].split('|')[0];speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang=VOICE[l];const v=speechSynthesis.getVoices().find(x=>x.lang&&x.lang.replace('_','-').toLowerCase().indexOf(l)===0);if(v)u.voice=v;u.rate=0.85;speechSynthesis.speak(u)}catch(e){}}
+try{if(window.speechSynthesis)speechSynthesis.getVoices()}catch(e){}
 
 /* ---------- упражнения ---------- */
 const META={
@@ -510,11 +515,13 @@ function twister(){
 function dispT(l,i){const p=LANGS[l].w[i].split('|');return p[1]?p[0]+'<small>'+p[1]+'</small>':p[0]}
 function boxes(l){let b=S.srs[l];if(!Array.isArray(b)||b.length!==RU.length){b=S.srs[l]=RU.map(()=>0)}return b}
 function langMenu(){
-  screen('Языки',`<p class="hint">Выбери язык. Слова, в которых ошибаешься, попадаются чаще. Слово считается выученным после трёх верных ответов без ошибок.</p>
+  screen('Языки',`<p class="hint">Выбери язык. Слова, в которых ошибаешься, попадаются чаще. Слово считается выученным после трёх верных ответов без ошибок. Слова произносит голос телефона.</p>
   <div class="langs">${Object.keys(LANGS).map(l=>{const n=learned(l);return `<button class="lang ${S.lang===l?'on':''}" data-l="${l}"><b>${LANGS[l].n}</b><span>${n} / ${RU.length} выучено</span><i style="--p:${Math.round(n/RU.length*100)}%"></i></button>`}).join('')}</div>
+  <button class="btn wide" id="vc">Озвучка слов: ${S.voice===false?'выключена':'включена'}</button>
   <button class="btn primary wide" id="go">Учить ${LANGS[S.lang].n.toLowerCase()} · 10 слов</button>`);
   app.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{S.lang=b.dataset.l;save();langMenu()});
   q('go').onclick=()=>langQuiz(S.lang);
+  q('vc').onclick=()=>{S.voice=(S.voice===false);save();langMenu()};
 }
 function langQuiz(l){
   const box=boxes(l),pool=RU.map((_,i)=>i),picks=[];
@@ -530,13 +537,14 @@ function langQuiz(l){
     locked=false;cur=picks[n];toT=Math.random()<0.5;
     opts=shuffle([cur,...shuffle(RU.map((_,k)=>k).filter(k=>k!==cur)).slice(0,3)]);
     q('qn').textContent=n+1;
-    q('pr').innerHTML=toT?`<span class="eyebrow">Как будет ${LANGS[l].adv}?</span><span class="w">${RU[cur]}</span>`:`<span class="eyebrow">Что это значит?</span><span class="w">${dispT(l,cur)}</span>`;
+    q('pr').innerHTML=toT?`<span class="eyebrow">Как будет ${LANGS[l].adv}?</span><span class="w">${RU[cur]}</span>`:`<span class="eyebrow">Что это значит?</span><span class="w">${dispT(l,cur)}</span><button class="say" id="sy">🔊 Послушать</button>`;
     q('op').innerHTML=opts.map((k,j)=>`<button class="opt" data-j="${j}">${toT?dispT(l,k):RU[k]}</button>`).join('');
     q('nxw').innerHTML='';
+    if(!toT){q('sy').onclick=()=>say(l,cur);say(l,cur)}
   }
   function choose(j){
     if(locked)return;locked=true;
-    const ok=opts[j]===cur,btns=q('op').children;
+    const ok=opts[j]===cur,btns=q('op').children;say(l,cur);
     btns[opts.indexOf(cur)].classList.add('is-right');
     if(ok){right++;box[cur]=Math.min(5,box[cur]+1);q('rt').textContent=right;save();after(next,750)}
     else{btns[j].classList.add('is-wrong');box[cur]=0;save();
